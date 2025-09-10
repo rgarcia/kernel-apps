@@ -1,0 +1,20 @@
+go to https://www.apple.com/ - What is the cost of Apple Vision Pro.
+go to https://arxiv.org/ - Search for the latest research papers on quantum computing submitted to ArXiv within the last two days.
+go to https://www.bbc.com/news/ - Get a brief overview of the economic implications of the UK's latest trade deal posted on BBC News and the date when the article was published.
+go to https://www.booking.com/ - Browse Booking's homepage to find out which company it belongs to.
+go to https://www.booking.com/ - Search a hotel with free WiFi and air conditioning in Bali from Jan 1 to Jan 4, 2024.
+go to https://www.booking.com/ - Get the hotel with highest review score and free cancelation in Chennai for 20/12/2024 - 21/12/2024.
+go to https://dictionary.cambridge.org/ - How many meanings of "unblemished" are given in Cambridge Dictionary? Please browse the page and give the number directly.
+go to https://dictionary.cambridge.org/ - Search for the word "ephemeral" on Cambridge Dictionary and find its translation into Spanish.
+go to https://www.coursera.org/ - How many results are there for a search on Coursera for Machine Learning, then filtered by Credit Eligible and 1-4 Years duration?
+go to https://www.espn.com/ - Check out NCAAW recruiting on ESPN, what colleges are the top three players from?
+go to https://github.com/ - Search for a 'virtual reality' related repository on GitHub updated in the last 10 days with at least 200 stars and summarize its main objective.
+go to https://www.google.com/travel/flights/ - Compare flight options and find the lowest round trip fare from New York to London departing on March 10, 2025, and returning on March 17, 2025.
+go to https://www.google.com/maps/ - Identify bus stops in Ypsilanti, MI, list three of them.
+go to https://www.google.com/ - Show a list of the top 5 highest-grossing animated movies, sorted by box office earnings.
+go to https://huggingface.co/ - How much is the Pro account of Hugging face for a month and what are the features?
+go to https://www.wolframalpha.com/ - Show the blood relationship fraction between you and your father's mother's sister's son.
+go to https://www.qatarairways.com/ - Look for a flight from London to Hong Kong with a layover in Doha
+Go to https://www.booking.com/, and open the first hotel's details page. You must never open links in new tab (don't Ctrl+click); the tab will open in the background, and you can switch to it later. Summarize the hotel's house rules. Then go back and SCROLL DOWN to find the name of the first hotel over GBP 500 for the entire trip
+go to https://www.amazon.com/ - Find a portable Bluetooth speaker on Amazon with a water-resistant design, under $50. It should have a minimum battery life of 10 hours.
+go to https://www.allrecipes.com/ - Find a recipe for banana bread with more than 200 reviews and a rating of at least 4.0 stars on Allrecipes.
