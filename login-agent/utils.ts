@@ -52,13 +52,19 @@ export function printFormattedOutput(items: ResponseOutputItem[]) {
   const reasoningItems: ResponseReasoningItem[] = items.filter((it: ResponseOutputItem) => it.type === 'reasoning');
   for (const r of reasoningItems) {
     const summaryItems = r.summary;
+    if (summaryItems.length === 0) continue;
     lines.push('- reasoning');
     for (const s of summaryItems) {
-      // just show a truncated first line
+      // just show a truncated lines
       const parts = s.text.split(/\r?\n/);
       if (parts.length === 0) continue;
       const first = truncateText(parts[0]);
       lines.push(`  - ${first}`);
+      for (let i = 1; i < parts.length; i++) {
+        const cont = parts[i].trimEnd();
+        if (!cont) continue;
+        lines.push(`    ${truncateText(cont)}`);
+      }
     }
   }
 
