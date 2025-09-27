@@ -1,0 +1,14 @@
+{
+  "id": "united",
+  "targetUrl": "https://www.united.com/",
+  "secrets": {
+    "$USERNAME": "$UNITED_USERNAME",
+    "$PASSWORD": "$UNITED_PASSWORD"
+  },
+  "success": [
+    {
+      "kind": "domSelectorVisible",
+      "selector": "button:has-text(\"Sign out\")"
+    }
+  ]
+}

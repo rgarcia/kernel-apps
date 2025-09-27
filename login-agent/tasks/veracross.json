@@ -1,0 +1,14 @@
+{
+  "id": "veracross",
+  "targetUrl": "https://accounts.veracross.com/sevenhills/portals/login",
+  "secrets": {
+    "$USERNAME": "$VC_USERNAME",
+    "$PASSWORD": "$VC_PASSWORD"
+  },
+  "success": [
+    {
+      "kind": "urlIncludes",
+      "value": "https://portals.veracross.com/sevenhills/parent"
+    }
+  ]
+}
