@@ -1,5 +1,4 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserEvaluateInput = {
   function: string;
@@ -7,26 +6,24 @@ export type BrowserEvaluateInput = {
   ref?: string;
 };
 
-export async function evaluateOnPage(page: Page, input: BrowserEvaluateInput) {
+async function evaluateWithCtx(ctx: ToolContext, input: BrowserEvaluateInput) {
   // If both ref and element are provided, evaluate on the element; otherwise on page
   if (input.ref && input.element) {
-    const locator = page.locator(`aria-ref=${input.ref}`);
+    const locator = ctx.page.locator(`aria-ref=${input.ref}`);
     const result = await locator.evaluate((node, fnSrc: string) => {
       const fn = (0, eval)(`(${fnSrc})`);
       return typeof fn === 'function' ? fn(node) : undefined;
     }, input.function);
     return { ok: true, result };
   }
-
-  const result = await page.evaluate((fnSrc: string) => {
+  const result = await ctx.page.evaluate((fnSrc: string) => {
     const fn = (0, eval)(`(${fnSrc})`);
     return typeof fn === 'function' ? fn() : undefined;
   }, input.function);
   return { ok: true, result };
 }
 
-export const browser_evaluate_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserEvaluate = defineTool<BrowserEvaluateInput, any>({
   name: 'browser_evaluate',
   description: 'Evaluate JavaScript expression on page or element',
   parameters: {
@@ -40,11 +37,7 @@ export const browser_evaluate_tool: OpenAIFunctionTool = {
     },
     required: ['function'],
   },
-  strict: false,
-};
-
-export function makeBrowserEvaluateExecutor(page: Page) {
-  return async (input: BrowserEvaluateInput) => evaluateOnPage(page, input);
-}
+  run: evaluateWithCtx,
+});
 
 

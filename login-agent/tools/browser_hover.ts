@@ -1,19 +1,17 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserHoverInput = {
   element: string;
   ref: string;
 };
 
-export async function hoverOnPage(page: Page, input: BrowserHoverInput) {
-  const locator = page.locator(`aria-ref=${input.ref}`);
+async function hoverWithCtx(ctx: ToolContext, input: BrowserHoverInput) {
+  const locator = ctx.page.locator(`aria-ref=${input.ref}`);
   await locator.hover();
   return { ok: true };
 }
 
-export const browser_hover_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserHover = defineTool<BrowserHoverInput, any>({
   name: 'browser_hover',
   description: 'Hover over an element to reveal menus or tooltips',
   parameters: {
@@ -24,11 +22,7 @@ export const browser_hover_tool: OpenAIFunctionTool = {
     },
     required: ['element', 'ref'],
   },
-  strict: false,
-};
-
-export function makeBrowserHoverExecutor(page: Page) {
-  return async (input: BrowserHoverInput) => hoverOnPage(page, input);
-}
+  run: hoverWithCtx,
+});
 
 

@@ -1,5 +1,4 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserClickInput = {
   element: string;
@@ -19,8 +18,8 @@ function mapModifiers(mods: BrowserClickInput['modifiers']): PlaywrightModifier[
     .filter((m): m is PlaywrightModifier => m === 'Alt' || m === 'Control' || m === 'Meta' || m === 'Shift');
 }
 
-export async function clickOnPage(page: Page, input: BrowserClickInput) {
-  const locator = page.locator(`aria-ref=${input.ref}`);
+async function clickOnPageWithCtx(ctx: ToolContext, input: BrowserClickInput) {
+  const locator = ctx.page.locator(`aria-ref=${input.ref}`);
   const options: { button?: 'left' | 'right' | 'middle'; modifiers?: PlaywrightModifier[] } = {
     button: input.button,
     modifiers: mapModifiers(input.modifiers),
@@ -35,8 +34,7 @@ export async function clickOnPage(page: Page, input: BrowserClickInput) {
   return { ok: true, action: 'click', ref: input.ref, options };
 }
 
-export const browser_click_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserClick = defineTool<BrowserClickInput, any>({
   name: 'browser_click',
   description: 'Perform click on a web page',
   parameters: {
@@ -50,11 +48,5 @@ export const browser_click_tool: OpenAIFunctionTool = {
     },
     required: ['element', 'ref'],
   },
-  strict: false,
-};
-
-export function makeBrowserClickExecutor(page: Page) {
-  return async (input: BrowserClickInput) => clickOnPage(page, input);
-}
-
-
+  run: clickOnPageWithCtx,
+});

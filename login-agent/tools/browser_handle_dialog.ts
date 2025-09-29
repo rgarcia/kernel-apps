@@ -1,12 +1,11 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserHandleDialogInput = {
   accept: boolean;
   promptText?: string;
 };
 
-export async function handleDialogOnPage(page: Page, input: BrowserHandleDialogInput) {
+async function handleDialogWithCtx(ctx: ToolContext, input: BrowserHandleDialogInput) {
   // Attach a one-time listener to handle the next dialog
   const listener = async (dialog: any) => {
     try {
@@ -14,12 +13,11 @@ export async function handleDialogOnPage(page: Page, input: BrowserHandleDialogI
       else await dialog.dismiss();
     } catch { }
   };
-  page.once('dialog', listener);
+  ctx.page.once('dialog', listener);
   return { ok: true };
 }
 
-export const browser_handle_dialog_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserHandleDialog = defineTool<BrowserHandleDialogInput, any>({
   name: 'browser_handle_dialog',
   description: 'Accept or dismiss the next dialog, with optional prompt text',
   parameters: {
@@ -30,11 +28,5 @@ export const browser_handle_dialog_tool: OpenAIFunctionTool = {
     },
     required: ['accept'],
   },
-  strict: false,
-};
-
-export function makeBrowserHandleDialogExecutor(page: Page) {
-  return async (input: BrowserHandleDialogInput) => handleDialogOnPage(page, input);
-}
-
-
+  run: handleDialogWithCtx,
+});

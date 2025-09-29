@@ -1,5 +1,4 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserWaitForInput = {
   time?: number;
@@ -7,7 +6,7 @@ export type BrowserWaitForInput = {
   textGone?: string;
 };
 
-export async function waitForOnPage(page: Page, input: BrowserWaitForInput) {
+async function waitForWithCtx(ctx: ToolContext, input: BrowserWaitForInput) {
   const { time, text, textGone } = input;
   if (!time && !text && !textGone)
     throw new Error('Either time, text or textGone must be provided');
@@ -17,18 +16,17 @@ export async function waitForOnPage(page: Page, input: BrowserWaitForInput) {
   }
 
   if (textGone) {
-    await page.getByText(textGone).first().waitFor({ state: 'hidden' });
+    await ctx.page.getByText(textGone).first().waitFor({ state: 'hidden' });
   }
 
   if (text) {
-    await page.getByText(text).first().waitFor({ state: 'visible' });
+    await ctx.page.getByText(text).first().waitFor({ state: 'visible' });
   }
 
   return { ok: true, waitedFor: text || textGone || time };
 }
 
-export const browser_wait_for_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserWaitFor = defineTool<BrowserWaitForInput, any>({
   name: 'browser_wait_for',
   description: 'Wait for text to appear or disappear or a specified time to pass',
   parameters: {
@@ -39,11 +37,6 @@ export const browser_wait_for_tool: OpenAIFunctionTool = {
       textGone: { type: 'string', description: 'The text to wait for to disappear' },
     },
   },
-  strict: false,
-};
-
-export function makeBrowserWaitForExecutor(page: Page) {
-  return async (input: BrowserWaitForInput) => waitForOnPage(page, input);
-}
-
+  run: waitForWithCtx,
+});
 

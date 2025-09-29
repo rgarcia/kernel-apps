@@ -8,12 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@paralleldrive/cuid2':
+        specifier: ^2.2.2
+        version: 2.2.2
       dotenv:
         specifier: ^17.2.2
         version: 17.2.2
       openai:
         specifier: ^5.22.0
-        version: 5.22.0
+        version: 5.22.0(zod@3.25.76)
       patchright:
         specifier: ^1.55.2
         version: 1.55.2
@@ -186,6 +189,13 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@noble/hashes@1.8.0':
+    resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
+    engines: {node: ^14.21.3 || >=16}
+
+  '@paralleldrive/cuid2@2.2.2':
+    resolution: {integrity: sha512-ZOBkgDwEdoYVlSeRbYYXs0S9MejQofiVYoTbKzy/6GQa39/q5tQU2IX46+shYnUkpEl3wc+J6wRlar7r2EK2xA==}
+
   '@types/node@24.5.2':
     resolution: {integrity: sha512-FYxk1I7wPv3K2XBaoyH2cTnocQEu8AOZ60hPbsyukMPLv5/5qr7V1i8PLHdl6Zf87I+xZXFvPCXYjiTFq+YSDQ==}
 
@@ -254,6 +264,9 @@ packages:
 
   undici-types@7.12.0:
     resolution: {integrity: sha512-goOacqME2GYyOZZfb5Lgtu+1IDmAlAEu5xnD3+xTzS10hT0vzpf0SPjkXwAw9Jm+4n/mQGDP3LO8CPbYROeBfQ==}
+
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
 
@@ -335,6 +348,12 @@ snapshots:
   '@esbuild/win32-x64@0.25.10':
     optional: true
 
+  '@noble/hashes@1.8.0': {}
+
+  '@paralleldrive/cuid2@2.2.2':
+    dependencies:
+      '@noble/hashes': 1.8.0
+
   '@types/node@24.5.2':
     dependencies:
       undici-types: 7.12.0
@@ -382,7 +401,9 @@ snapshots:
 
   kleur@3.0.3: {}
 
-  openai@5.22.0: {}
+  openai@5.22.0(zod@3.25.76):
+    optionalDependencies:
+      zod: 3.25.76
 
   patchright-core@1.55.2: {}
 
@@ -409,3 +430,6 @@ snapshots:
       fsevents: 2.3.3
 
   undici-types@7.12.0: {}
+
+  zod@3.25.76:
+    optional: true

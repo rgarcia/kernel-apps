@@ -1,13 +1,16 @@
+import { createId } from '@paralleldrive/cuid2';
 import 'dotenv/config';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import OpenAI from 'openai';
-import type { FunctionTool as OpenAIFunctionTool, ResponseCreateParamsNonStreaming, ResponseFunctionToolCall, ResponseInput, ResponseInputItem } from 'openai/resources/responses/responses';
+import type { ResponseCreateParamsNonStreaming, ResponseFunctionToolCall, ResponseInput, ResponseInputItem } from 'openai/resources/responses/responses';
 import type { Reasoning } from 'openai/resources/shared';
-import { BrowserContext, chromium, type Page } from 'patchright';
+import { BrowserContext, chromium } from 'patchright';
 import { InMemorySecretStore } from './secret_store';
-import { createOpenAITools, type OpenAIToolDefinitionAndExecutor } from './tools';
+import { defaultTools } from './tools';
+import { createToolkit, ToolContext, type Toolkit } from './tools/toolkit';
 import { formatTimestamp, printFormattedOutput, substituteEnvInSecrets, writeJson } from './utils';
+
 
 type SuccessDetector =
   | { kind: 'urlIncludes'; value: string }
@@ -29,13 +32,13 @@ type ProviderOptions = {
   reasoning?: Reasoning | null;
 };
 
-type LoginAgentConfig = {
-  page: Page;
+type LoginAgentInput = {
+  ctx: ToolContext;
   model: string;
   providerOptions?: ProviderOptions;
   targetUrl: string;
   secretVars: string[];
-  tools: Record<string, OpenAIToolDefinitionAndExecutor>;
+  tools: Toolkit;
   policies?: AgentPolicy;
   success: SuccessDetector[];
   telemetry?: AgentTelemetry;
@@ -60,11 +63,13 @@ type TaskConfig = {
 };
 
 
-async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
-  const { page, model, providerOptions, targetUrl, secretVars, tools, policies, success, telemetry, taskId } = options;
+async function logInAgent(options: LoginAgentInput): Promise<TaskResult> {
+  const runId = createId();
+  console.log(`Run ID: ${runId}`);
+  const { ctx, model, providerOptions, targetUrl, secretVars, tools, policies, success, telemetry, taskId } = options;
 
-  await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
-  const snapshot = await (page as any)._snapshotForAI?.();
+  await ctx.page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+  const snapshot = await (ctx.page as any)._snapshotForAI?.();
 
   const system = [
     'You are a careful, deterministic web automation agent operating a real browser.',
@@ -112,8 +117,6 @@ async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
   // OpenAI Responses client
   const openai = new OpenAI();
 
-  const functionTools: OpenAIFunctionTool[] = Object.values(tools).map(t => t.definition);
-
   const conversation = await openai.conversations.create({});
 
   // Build initial input list
@@ -128,7 +131,7 @@ async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
     // Prepare request body
     const body: ResponseCreateParamsNonStreaming = {
       model,
-      tools: functionTools,
+      tools: Object.values(tools.asOpenAITools()),
       input,
       instructions: system,
       parallel_tool_calls: true,
@@ -136,6 +139,7 @@ async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
       reasoning: providerOptions?.reasoning ?? null,
       prompt_cache_key: taskId,
       conversation: conversation.id,
+      metadata: { runId },
     };
 
     // Telemetry: write request
@@ -163,7 +167,7 @@ async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
 
     stepsTaken += 1;
     console.log('--- Step finished ---');
-    console.log(`step: ${currentStepNumber}, llm_ms: ${Math.round(durationMs)}, llm_s: ${(durationMs / 1000).toFixed(2)}`);
+    console.log(`step: ${currentStepNumber}, llm_s: ${(durationMs / 1000).toFixed(2)}`);
     printFormattedOutput(output);
     if (toolCalls.length === 0) {
       console.log('no tool calls, assuming complete');
@@ -192,7 +196,7 @@ async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
         continue;
       }
 
-      const exec = tools[name]?.executor;
+      const exec = tools.get(name)?.bind(ctx);
       let toolResult: any;
       try {
         if (typeof exec !== 'function') throw new Error(`Tool executor not found: ${name}`);
@@ -211,13 +215,13 @@ async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
     }
 
     if (policies?.coolDownMsAfterNav && invokedToolNames.includes('browser_navigate')) {
-      await page.waitForTimeout(policies.coolDownMsAfterNav);
+      await ctx.page.waitForTimeout(policies.coolDownMsAfterNav);
     }
   }
 
   console.log(`total_llm_ms: ${Math.round(totalLlmWaitMs)}, total_llm_s: ${(totalLlmWaitMs / 1000).toFixed(2)}`);
 
-  const finalUrl = page.url();
+  const finalUrl = ctx.page.url();
   const detectorResults: Array<{ id: string; ok: boolean }> = [];
   for (const detector of success) {
     if (detector.kind === 'urlIncludes') {
@@ -228,7 +232,7 @@ async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
     if (detector.kind === 'domSelectorVisible') {
       let ok = false;
       try {
-        ok = await page.locator(detector.selector).first().isVisible();
+        ok = await ctx.page.locator(detector.selector).first().isVisible();
       } catch {
         ok = false;
       }
@@ -268,8 +272,8 @@ async function logInAgent(options: LoginAgentConfig): Promise<TaskResult> {
 
 async function run(context: BrowserContext) {
   const page = await context.newPage();
-  const secretStore = new InMemorySecretStore();
-  const tools = createOpenAITools(page, secretStore);
+  const secrets = new InMemorySecretStore();
+  const toolkit = createToolkit({ page, secrets }, defaultTools);
 
   const argv = process.argv.slice(2);
   const taskPath = argv[0];
@@ -299,7 +303,7 @@ async function run(context: BrowserContext) {
   const substitutedSecrets = substituteEnvInSecrets(config.secrets);
   // Seed secret store with what's provided
   for (const [k, v] of Object.entries(substitutedSecrets)) {
-    secretStore.setSecret(k, v);
+    secrets.setSecret(k, v);
   }
 
   // defaults
@@ -318,12 +322,12 @@ async function run(context: BrowserContext) {
   };
 
   const agentResult = await logInAgent({
-    page,
+    ctx: { page, secrets },
     model,
     providerOptions,
     targetUrl: config.targetUrl,
     secretVars: Object.keys(substitutedSecrets),
-    tools,
+    tools: toolkit,
     policies,
     telemetry,
     success: config.success,

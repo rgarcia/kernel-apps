@@ -1,17 +1,15 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserNavigateInput = {
   url: string;
 };
 
-export async function navigatePage(page: Page, input: BrowserNavigateInput) {
-  await page.goto(input.url);
+async function navigateWithCtx(ctx: ToolContext, input: BrowserNavigateInput) {
+  await ctx.page.goto(input.url);
   return { ok: true, url: input.url };
 }
 
-export const browser_navigate_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserNavigate = defineTool<BrowserNavigateInput, any>({
   name: 'browser_navigate',
   description: 'Navigate to a URL',
   parameters: {
@@ -21,11 +19,7 @@ export const browser_navigate_tool: OpenAIFunctionTool = {
     },
     required: ['url'],
   },
-  strict: false,
-};
-
-export function makeBrowserNavigateExecutor(page: Page) {
-  return async (input: BrowserNavigateInput) => navigatePage(page, input);
-}
+  run: navigateWithCtx,
+});
 
 

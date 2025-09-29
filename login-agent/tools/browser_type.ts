@@ -1,6 +1,5 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
-import { resolveSecretMaybe, type SecretStore } from '../secret_store';
+import { resolveSecretMaybe } from '../secret_store';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserTypeInput = {
   element: string;
@@ -10,25 +9,22 @@ export type BrowserTypeInput = {
   slowly?: boolean;
 };
 
-export function createTypeOnPage(secrets: SecretStore) {
-  return async function typeOnPage(page: Page, input: BrowserTypeInput): Promise<{ ok: boolean }> {
-    const locator = page.locator(`aria-ref=${input.ref}`);
-    const text = resolveSecretMaybe(input.text, secrets);
-    if (input.slowly) {
-      await locator.click({ force: true });
-      await page.keyboard.type(text);
-    } else {
-      await locator.fill(text);
-    }
-    if (input.submit) {
-      await locator.press('Enter');
-    }
-    return { ok: true };
-  };
+async function typeWithCtx(ctx: ToolContext, input: BrowserTypeInput) {
+  const locator = ctx.page.locator(`aria-ref=${input.ref}`);
+  const text = resolveSecretMaybe(input.text, ctx.secrets!);
+  if (input.slowly) {
+    await locator.click({ force: true });
+    await ctx.page.keyboard.type(text);
+  } else {
+    await locator.fill(text);
+  }
+  if (input.submit) {
+    await locator.press('Enter');
+  }
+  return { ok: true };
 }
 
-export const browser_type_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserType = defineTool<BrowserTypeInput, any>({
   name: 'browser_type',
   description: 'Type text into editable element',
   parameters: {
@@ -42,12 +38,5 @@ export const browser_type_tool: OpenAIFunctionTool = {
     },
     required: ['element', 'ref', 'text'],
   },
-  strict: false,
-};
-
-export function makeBrowserTypeExecutor(page: Page, secrets: SecretStore) {
-  const typeOnPage = createTypeOnPage(secrets);
-  return async (input: BrowserTypeInput) => typeOnPage(page, input);
-}
-
-
+  run: typeWithCtx,
+});

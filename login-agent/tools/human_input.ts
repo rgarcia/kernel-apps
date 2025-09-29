@@ -1,6 +1,5 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
 import prompts from 'prompts';
-import type { SecretStore } from '../secret_store';
+import { defineTool, ToolContext } from './toolkit';
 
 export type HumanInputToolInput = {
   message: string;
@@ -11,7 +10,7 @@ export type HumanInputToolInput = {
   secret?: string;
 };
 
-export async function promptHuman(input: HumanInputToolInput, secrets: SecretStore) {
+export async function promptHumanWithCtx(ctx: ToolContext, input: HumanInputToolInput) {
   const { message, kind = 'text', choices, initial, hint, secret } = input;
 
   const question: any = {
@@ -37,7 +36,7 @@ export async function promptHuman(input: HumanInputToolInput, secrets: SecretSto
       if (typeof value !== 'string' && typeof value !== 'number') {
         return { ok: false, error: 'Secret value must be string or number' };
       }
-      secrets.setSecret(secret, String(value));
+      ctx.secrets!.setSecret(secret, String(value));
       return { ok: true, stored: true };
     }
     return { ok: true, value };
@@ -46,8 +45,7 @@ export async function promptHuman(input: HumanInputToolInput, secrets: SecretSto
   }
 }
 
-export const human_input_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const humanInput = defineTool<HumanInputToolInput, any>({
   name: 'human_input',
   description: 'Prompt the human operator for input. Useful for secrets or decisions.',
   parameters: {
@@ -64,11 +62,6 @@ export const human_input_tool: OpenAIFunctionTool = {
     },
     required: ['message'],
   },
-  strict: false,
-};
-
-export function makeHumanInputExecutor(secrets: SecretStore) {
-  return async (input: HumanInputToolInput) => promptHuman(input, secrets);
-}
-
+  run: promptHumanWithCtx,
+});
 

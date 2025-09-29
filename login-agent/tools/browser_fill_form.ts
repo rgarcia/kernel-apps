@@ -1,6 +1,5 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
-import { resolveSecretMaybe, type SecretStore } from '../secret_store';
+import { resolveSecretMaybe } from '../secret_store';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserFillFormInput = {
   fields: Array<{
@@ -11,32 +10,30 @@ export type BrowserFillFormInput = {
   }>;
 };
 
-export function createFillFormOnPage(secrets: SecretStore) {
-  return async function fillFormOnPage(page: Page, input: BrowserFillFormInput): Promise<{ ok: boolean }> {
-    const fields = input.fields.map(f => {
-      if (f.type === 'textbox') {
-        const resolved = resolveSecretMaybe(f.value, secrets);
-        return { ...f, value: resolved };
-      }
-      return f;
-    });
-    for (const field of fields) {
-      const locator = page.locator(`aria-ref=${field.ref}`);
-      if (field.type === 'textbox' || field.type === 'slider') {
-        await locator.fill(field.value);
-      } else if (field.type === 'checkbox' || field.type === 'radio') {
-        const shouldCheck = field.value === 'true';
-        await locator.setChecked(shouldCheck);
-      } else if (field.type === 'combobox') {
-        await locator.selectOption({ label: field.value });
-      }
+async function fillFormWithCtx(ctx: ToolContext, input: BrowserFillFormInput) {
+  const secrets = ctx.secrets!;
+  const fields = input.fields.map(f => {
+    if (f.type === 'textbox') {
+      const resolved = resolveSecretMaybe(f.value, secrets);
+      return { ...f, value: resolved };
     }
-    return { ok: true };
-  };
+    return f;
+  });
+  for (const field of fields) {
+    const locator = ctx.page.locator(`aria-ref=${field.ref}`);
+    if (field.type === 'textbox' || field.type === 'slider') {
+      await locator.fill(field.value);
+    } else if (field.type === 'checkbox' || field.type === 'radio') {
+      const shouldCheck = field.value === 'true';
+      await locator.setChecked(shouldCheck);
+    } else if (field.type === 'combobox') {
+      await locator.selectOption({ label: field.value });
+    }
+  }
+  return { ok: true };
 }
 
-export const browser_fill_form_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserFillForm = defineTool<BrowserFillFormInput, any>({
   name: 'browser_fill_form',
   description: 'Fill multiple form fields',
   parameters: {
@@ -59,12 +56,6 @@ export const browser_fill_form_tool: OpenAIFunctionTool = {
     },
     required: ['fields'],
   },
-  strict: false,
-};
-
-export function makeBrowserFillFormExecutor(page: Page, secrets: SecretStore) {
-  const fillFormOnPage = createFillFormOnPage(secrets);
-  return async (input: BrowserFillFormInput) => fillFormOnPage(page, input);
-}
-
+  run: fillFormWithCtx,
+});
 

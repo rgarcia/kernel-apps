@@ -1,17 +1,15 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserPressKeyInput = {
   key: string;
 };
 
-export async function pressKeyOnPage(page: Page, input: BrowserPressKeyInput) {
-  await page.keyboard.press(input.key);
+async function pressKeyWithCtx(ctx: ToolContext, input: BrowserPressKeyInput) {
+  await ctx.page.keyboard.press(input.key);
   return { ok: true, key: input.key };
 }
 
-export const browser_press_key_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserPressKey = defineTool<BrowserPressKeyInput, any>({
   name: 'browser_press_key',
   description: 'Press a key on the keyboard',
   parameters: {
@@ -21,11 +19,6 @@ export const browser_press_key_tool: OpenAIFunctionTool = {
     },
     required: ['key'],
   },
-  strict: false,
-};
-
-export function makeBrowserPressKeyExecutor(page: Page) {
-  return async (input: BrowserPressKeyInput) => pressKeyOnPage(page, input);
-}
-
+  run: pressKeyWithCtx,
+});
 

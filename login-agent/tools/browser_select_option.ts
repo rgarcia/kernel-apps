@@ -1,5 +1,4 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserSelectOptionInput = {
   element: string;
@@ -8,8 +7,8 @@ export type BrowserSelectOptionInput = {
   value?: string;
 };
 
-export async function selectOptionOnPage(page: Page, input: BrowserSelectOptionInput) {
-  const locator = page.locator(`aria-ref=${input.ref}`);
+async function selectWithCtx(ctx: ToolContext, input: BrowserSelectOptionInput) {
+  const locator = ctx.page.locator(`aria-ref=${input.ref}`);
   if (input.label) {
     await locator.selectOption({ label: input.label });
     return { ok: true, by: 'label', label: input.label };
@@ -21,8 +20,7 @@ export async function selectOptionOnPage(page: Page, input: BrowserSelectOptionI
   throw new Error('Either label or value must be provided');
 }
 
-export const browser_select_option_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserSelectOption = defineTool<BrowserSelectOptionInput, any>({
   name: 'browser_select_option',
   description: 'Select an option in a dropdown',
   parameters: {
@@ -35,11 +33,8 @@ export const browser_select_option_tool: OpenAIFunctionTool = {
     },
     required: ['element', 'ref'],
   },
-  strict: false,
-};
+  run: selectWithCtx,
+});
 
-export function makeBrowserSelectOptionExecutor(page: Page) {
-  return async (input: BrowserSelectOptionInput) => selectOptionOnPage(page, input);
-}
 
 

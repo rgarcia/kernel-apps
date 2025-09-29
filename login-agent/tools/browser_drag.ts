@@ -1,5 +1,4 @@
-import type { FunctionTool as OpenAIFunctionTool } from 'openai/resources/responses/responses';
-import type { Page } from 'patchright';
+import { defineTool, type ToolContext } from './toolkit';
 
 export type BrowserDragInput = {
   element: string;
@@ -8,25 +7,24 @@ export type BrowserDragInput = {
   targetRef?: string;
 };
 
-export async function dragOnPage(page: Page, input: BrowserDragInput) {
-  const source = page.locator(`aria-ref=${input.ref}`);
+async function dragWithCtx(ctx: ToolContext, input: BrowserDragInput) {
+  const source = ctx.page.locator(`aria-ref=${input.ref}`);
   if (input.targetRef) {
-    const target = page.locator(`aria-ref=${input.targetRef}`);
+    const target = ctx.page.locator(`aria-ref=${input.targetRef}`);
     await source.dragTo(target);
     return { ok: true, mode: 'element-to-element' };
   }
   // If no target provided, perform a small drag gesture to itself to trigger DnD
   const box = await source.boundingBox();
   if (!box) throw new Error('Source element not visible');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 10, box.y + box.height / 2 + 10);
-  await page.mouse.up();
+  await ctx.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await ctx.page.mouse.down();
+  await ctx.page.mouse.move(box.x + box.width / 2 + 10, box.y + box.height / 2 + 10);
+  await ctx.page.mouse.up();
   return { ok: true, mode: 'self-drag' };
 }
 
-export const browser_drag_tool: OpenAIFunctionTool = {
-  type: 'function',
+export const browserDrag = defineTool<BrowserDragInput, any>({
   name: 'browser_drag',
   description: 'Drag and drop between elements or perform a drag gesture',
   parameters: {
@@ -39,11 +37,7 @@ export const browser_drag_tool: OpenAIFunctionTool = {
     },
     required: ['element', 'ref'],
   },
-  strict: false,
-};
-
-export function makeBrowserDragExecutor(page: Page) {
-  return async (input: BrowserDragInput) => dragOnPage(page, input);
-}
+  run: dragWithCtx,
+});
 
 
