@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import type { ResponseCreateParamsNonStreaming, ResponseFunctionToolCall, ResponseInput, ResponseInputItem } from 'openai/resources/responses/responses';
 import type { Reasoning } from 'openai/resources/shared';
 import { BrowserContext, chromium } from 'patchright';
+import { webJudgeLoginEval, type WebJudgeResult } from './evals';
 import { InMemorySecretStore } from './secret_store';
 import { defaultTools } from './tools';
 import { createToolkit, ToolContext, type Toolkit } from './tools/toolkit';
@@ -40,7 +41,7 @@ type LoginAgentInput = {
   secretVars: string[];
   tools: Toolkit;
   policies?: AgentPolicy;
-  success: SuccessDetector[];
+  success?: SuccessDetector[];
   telemetry?: AgentTelemetry;
   taskId?: string;
 };
@@ -52,6 +53,9 @@ type TaskResult = {
   matchedDetectors: string[];
   failureReason?: string;
   trajectoryPath?: string;
+  actions?: string[]; // one string per step with tool calls
+  screenshots?: string[]; // one image path per step
+  webjudge?: WebJudgeResult;
 };
 
 
@@ -59,7 +63,7 @@ type TaskConfig = {
   id: string;
   targetUrl: string;
   secrets: Record<string, string>;
-  success: SuccessDetector[];
+  success?: SuccessDetector[];
 };
 
 
@@ -113,6 +117,8 @@ async function logInAgent(options: LoginAgentInput): Promise<TaskResult> {
 
   let stepsTaken = 0;
   let totalLlmWaitMs = 0;
+  const stepActions: string[] = [];
+  const stepScreenshots: string[] = [];
 
   // OpenAI Responses client
   const openai = new OpenAI();
@@ -177,6 +183,9 @@ async function logInAgent(options: LoginAgentInput): Promise<TaskResult> {
     // prepare input for next completion
     input = [];
     const invokedToolNames: string[] = [];
+    // Collect action string for this step (join multiple tool calls)
+    const stepActionItems: string[] = toolCalls.map((fc) => `${fc.name}(${fc.arguments})`);
+    stepActions.push(stepActionItems.join('; '));
     for (const call of toolCalls) {
       const name = call.name;
       const argsText = call.arguments;
@@ -217,13 +226,25 @@ async function logInAgent(options: LoginAgentInput): Promise<TaskResult> {
     if (policies?.coolDownMsAfterNav && invokedToolNames.includes('browser_navigate')) {
       await ctx.page.waitForTimeout(policies.coolDownMsAfterNav);
     }
+
+    // Take a screenshot at the end of the step and persist path
+    if (telemetryDir) {
+      const screenshotPath = path.join(telemetryDir, `loginAgent-${ts}-step-${currentStepNumber}.png`);
+      try {
+        await ctx.page.screenshot({ path: screenshotPath, fullPage: true });
+        stepScreenshots.push(screenshotPath);
+      } catch (err) {
+        console.warn('failed to capture screenshot:', err);
+        stepScreenshots.push('');
+      }
+    }
   }
 
   console.log(`total_llm_ms: ${Math.round(totalLlmWaitMs)}, total_llm_s: ${(totalLlmWaitMs / 1000).toFixed(2)}`);
 
   const finalUrl = ctx.page.url();
   const detectorResults: Array<{ id: string; ok: boolean }> = [];
-  for (const detector of success) {
+  for (const detector of success ?? []) {
     if (detector.kind === 'urlIncludes') {
       const ok = finalUrl.includes(detector.value);
       detectorResults.push({ id: `urlIncludes:${detector.value}`, ok });
@@ -242,18 +263,38 @@ async function logInAgent(options: LoginAgentInput): Promise<TaskResult> {
   }
 
   const matchedDetectors = detectorResults.filter(r => r.ok).map(r => r.id);
-  const allMatched = detectorResults.every(r => r.ok);
-  const failureReason = allMatched
-    ? undefined
-    : `Failed detectors: ${detectorResults.filter(r => !r.ok).map(r => r.id).join(', ')}`;
+  const allMatched = detectorResults.length === 0 ? false : detectorResults.every(r => r.ok);
+  const failureReason = detectorResults.length === 0
+    ? 'No success detectors configured.'
+    : (allMatched ? undefined : `Failed detectors: ${detectorResults.filter(r => !r.ok).map(r => r.id).join(', ')}`);
 
-  const result: TaskResult = {
+  let result: TaskResult = {
     ok: allMatched,
     stepsTaken,
     finalUrl,
     matchedDetectors,
     failureReason,
+    actions: stepActions,
+    screenshots: stepScreenshots,
   };
+
+  // Always run WebJudge evaluator with hardcoded parameters
+  try {
+    const webjudgeTask = `Log in to ${targetUrl} using the browser tools provided.`;
+    const wj = await webJudgeLoginEval(
+      webjudgeTask,
+      stepActions,
+      stepScreenshots.filter(Boolean),
+      { model: 'gpt-5', scoreThreshold: 4, maxImages: 50 },
+    );
+    result.webjudge = wj;
+    result.ok = wj.status === 'success';
+    result.failureReason = result.ok ? undefined : 'WebJudge evaluation returned failure';
+  } catch (err: any) {
+    // If WebJudge fails, keep detector-based result but record failure reason
+    result.webjudge = undefined;
+    result.failureReason = `WebJudge error: ${err?.message ?? String(err)}`;
+  }
 
   // Write IO JSON
   if (ioFilePath) {
@@ -296,9 +337,6 @@ async function run(context: BrowserContext) {
   if (!config.secrets || typeof config.secrets !== 'object') {
     throw new Error('Task JSON must include a "secrets" object');
   }
-  if (!Array.isArray(config.success) || config.success.length === 0) {
-    throw new Error('Task JSON must include a non-empty "success" array');
-  }
 
   const substitutedSecrets = substituteEnvInSecrets(config.secrets);
   // Seed secret store with what's provided
@@ -333,7 +371,7 @@ async function run(context: BrowserContext) {
     success: config.success,
     taskId: config.id,
   });
-  console.log('agent result:', agentResult);
+  console.log('agent result:', JSON.stringify(agentResult, null, 2));
 
   await page.waitForTimeout(10000);
   await context.close();
