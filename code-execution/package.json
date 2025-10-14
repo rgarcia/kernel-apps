@@ -1,0 +1,17 @@
+{
+  "name": "ts-basic",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@onkernel/sdk": ">=0.8.0",
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "tsx": "^4.20.6"
+  }
+}
